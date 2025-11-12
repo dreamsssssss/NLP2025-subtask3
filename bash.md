@@ -3,6 +3,8 @@
 Commands currently in use for the Subtask 3 pipeline. Each entry explains the purpose and the primary outputs or side effects.
 
 ## Docker Environment
+
+- `git clone https://github.com/MinKuanIsHere/NLP2025-subtask3.git`
 - `cd subtask3`
   Go to folder.
 
