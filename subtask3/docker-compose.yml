@@ -1,0 +1,37 @@
+services:
+  dimabsa_subtask3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nlp_dimabsa_subtask3:latest
+    container_name: nlp_dimabsa_subtask3
+    working_dir: /workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0", "1", "2", "3"]
+              capabilities: ["gpu"]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0,1,2,3
+      - HF_HOME=/workspace/model/hf_cache
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8888:8888"
+    command: ["/bin/bash"]
+    tty: true
+    stdin_open: true
+    networks:
+      dimabsa_net:
+        ipv4_address: 172.31.0.10
+
+networks:
+  dimabsa_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24

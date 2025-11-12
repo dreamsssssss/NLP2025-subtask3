@@ -1,0 +1,13 @@
+.env
+__pycache__/
+node_modules/
+.DS_Store
+
+DimABSA2026/
+AGENTS.md
+plan_subtask3.md
+note.md
+
+subtask3/model/**
+!subtask3/model/.gitkeep
+!subtask3/model/.gitignore

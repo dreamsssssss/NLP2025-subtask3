@@ -1,0 +1,8 @@
+[2025-11-06 13:30:34,426][_client.py][line:1025][INFO] HTTP Request: HEAD https://huggingface.co/bert-base-multilingual-cased/resolve/main/tokenizer_config.json "HTTP/1.1 200 OK"
+[2025-11-06 13:30:34,624][_client.py][line:1025][INFO] HTTP Request: GET https://huggingface.co/api/models/bert-base-multilingual-cased/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 307 Temporary Redirect"
+[2025-11-06 13:30:34,825][_client.py][line:1025][INFO] HTTP Request: GET https://huggingface.co/api/models/google-bert/bert-base-multilingual-cased/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+[2025-11-06 13:30:35,141][_client.py][line:1025][INFO] HTTP Request: HEAD https://huggingface.co/bert-base-multilingual-cased/resolve/main/config.json "HTTP/1.1 200 OK"
+[2025-11-06 13:30:35,341][_client.py][line:1025][INFO] HTTP Request: HEAD https://huggingface.co/bert-base-multilingual-cased/resolve/main/model.safetensors "HTTP/1.1 302 Found"
+[2025-11-06 13:30:35,396][run_task2&3_trainer_multilingual.py][line:913][WARNING] CUDA requested but not available. Continuing with CPU execution.
+[2025-11-06 13:30:35,397][run_task2&3_trainer_multilingual.py][line:937][INFO] loading model checkpoint from ./model/task3_lap_zho.pth
+[2025-11-06 13:30:36,252][run_task2&3_trainer_multilingual.py][line:944][INFO] evaluating......
