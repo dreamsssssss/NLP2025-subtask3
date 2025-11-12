@@ -20,18 +20,48 @@ Commands currently in use for the Subtask 3 pipeline. Each entry explains the 
 ## Model Training
 
 ### data laptop bert-base-multilingual-cased
-- `cd starter_kit/task2task3 && CUDA_VISIBLE_DEVICES=1 python run_task2\&3_trainer_multilingual.py --task 3 --domain lap --language zho --train_data zho_laptop_train_alltasks.jsonl --infer_data zho_laptop_dev_task3.jsonl --bert_model_type bert-base-multilingual-cased --mode train --gpu True --epoch_num 1 --batch_size 1 --learning_rate 1e-3 --tuning_bert_rate 1e-5 --model_name zho_lap_subtask3`  
-  Fine-tunes the Subtask 3 model on the laptop/ZH dataset using GPU 1. Produces:
-  - `model/task3_lap_zho.pth` – latest checkpoint.  
-  - `log/zho_lap_subtask3.log` – training losses and evaluation metrics.  
-  - `tasks/subtask_3/pred_zho_laptop.jsonl` – dev predictions generated automatically at the end of training.
+```bash
+cd starter_kit/task2task3 && CUDA_VISIBLE_DEVICES=1 python run_task2\&3_trainer_multilingual.py \
+  --task 3 \
+  --domain lap \
+  --language zho \
+  --train_data zho_laptop_train_alltasks.jsonl \
+  --infer_data zho_laptop_dev_task3.jsonl \
+  --bert_model_type bert-base-multilingual-cased \
+  --mode train \
+  --gpu True \
+  --epoch_num 1 \
+  --batch_size 1 \
+  --learning_rate 1e-3 \
+  --tuning_bert_rate 1e-5 \
+  --model_name zho_lap_subtask3
+```
+Fine-tunes the Subtask 3 model on the laptop/ZH dataset using GPU 1. Produces:
+- `model/task3_lap_zho.pth` – latest checkpoint.  
+- `log/zho_lap_subtask3.log` – training losses and evaluation metrics.  
+- `tasks/subtask_3/pred_zho_laptop.jsonl` – dev predictions generated automatically at the end of training.
 
 ### data laptop bert-base-chinese
-- `cd starter_kit/task2task3 && CUDA_VISIBLE_DEVICES=1 python run_task2\&3_trainer_multilingual.py --task 3 --domain lap --language zho --train_data zho_laptop_train_alltasks.jsonl --infer_data zho_laptop_dev_task3.jsonl --bert_model_type bert-base-chinese --mode train --gpu True --epoch_num 1 --batch_size 1 --learning_rate 1e-3 --tuning_bert_rate 1e-5 --model_name zho_lap_subtask3_bertzh`  
-  Re-runs training with the Chinese-only BERT backbone. Outputs:
-  - `model/task3_lap_zho.pth` (overwritten unless you change the model name).
-  - `log/zho_lap_subtask3_bertzh.log` (if the model name differs).  
-  - `tasks/subtask_3/pred_zho_laptop.jsonl` – refreshed predictions based on the new backbone.
+```bash
+cd starter_kit/task2task3 && CUDA_VISIBLE_DEVICES=1 python run_task2\&3_trainer_multilingual.py \
+  --task 3 \
+  --domain lap \
+  --language zho \
+  --train_data zho_laptop_train_alltasks.jsonl \
+  --infer_data zho_laptop_dev_task3.jsonl \
+  --bert_model_type bert-base-chinese \
+  --mode train \
+  --gpu True \
+  --epoch_num 1 \
+  --batch_size 1 \
+  --learning_rate 1e-3 \
+  --tuning_bert_rate 1e-5 \
+  --model_name zho_lap_subtask3_bertzh
+```
+Re-runs training with the Chinese-only BERT backbone. Outputs:
+- `model/task3_lap_zho.pth` (overwritten unless you change the model name).
+- `log/zho_lap_subtask3_bertzh.log` (if the model name differs).  
+- `tasks/subtask_3/pred_zho_laptop.jsonl` – refreshed predictions based on the new backbone.
 
 ### data restaurant bert-base-chinese
 ```bash
