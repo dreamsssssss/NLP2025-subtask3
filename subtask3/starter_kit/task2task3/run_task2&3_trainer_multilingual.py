@@ -892,7 +892,12 @@ def train(args, train_total_data, test_total_data, inference_dataset, category_m
 
     # init logger and tokenize
     logger, fh, sh = Utils.get_logger(log_path)
+    # 用 AutoTokenizer 載任何模型（包含 Qwen3-8B）
     tokenize = AutoTokenizer.from_pretrained(args.bert_model_type)
+
+    # Qwen3 通常沒有 pad_token，要手動補一下
+    if tokenize.pad_token is None and tokenize.eos_token is not None:
+        tokenize.pad_token = tokenize.eos_token
 
     # for training
     train_data = train_total_data['train']
@@ -1258,3 +1263,4 @@ if __name__ == '__main__':
     train_dataset, test_dataset, category_dict = load_train_data_multilingual(args)
     inference_dataset = load_inference_data(args) # ID_LIST, TEXT_LIST, QA_LIST
     train(args, train_dataset, test_dataset, inference_dataset, category_dict)
+
