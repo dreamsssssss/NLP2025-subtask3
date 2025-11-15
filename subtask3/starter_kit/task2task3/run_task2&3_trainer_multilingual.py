@@ -1158,6 +1158,9 @@ def train(args, train_total_data, test_total_data, inference_dataset, category_m
 
 def load_inference_data(args):
     tokenizer = AutoTokenizer.from_pretrained(args.bert_model_type)
+    if tokenizer.pad_token is None and tokenizer.eos_token is not None:
+        tokenizer.pad_token = tokenizer.eos_token
+        
     inference_datasets = []
 
     # train_data_path, dev_data_path, test_data_path = dataset_path_map[args.domain + '_' + args.language]
@@ -1180,6 +1183,8 @@ def load_inference_data(args):
 def load_train_data_multilingual(args):
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.bert_model_type)
+    if tokenizer.pad_token is None and tokenizer.eos_token is not None:
+        tokenizer.pad_token = tokenizer.eos_token
     def find_word_indices(text, phrase):
         words = tokenizer.tokenize(text)[:256]
         if phrase == "NULL" or not phrase:
@@ -1263,4 +1268,5 @@ if __name__ == '__main__':
     train_dataset, test_dataset, category_dict = load_train_data_multilingual(args)
     inference_dataset = load_inference_data(args) # ID_LIST, TEXT_LIST, QA_LIST
     train(args, train_dataset, test_dataset, inference_dataset, category_dict)
+
 
