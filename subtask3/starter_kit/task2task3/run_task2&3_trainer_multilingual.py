@@ -895,7 +895,17 @@ def train(args, train_total_data, test_total_data, inference_dataset, category_m
     tokenize = AutoTokenizer.from_pretrained(args.bert_model_type)
     if tokenize.pad_token is None and tokenize.eos_token is not None:
         tokenize.pad_token = tokenize.eos_token
+     # for training
+    train_data = train_total_data['train']
+    max_len = train_total_data[args.max_len]
+    max_aspect_num = train_total_data[args.max_aspect_num]
 
+    # for evaluating as inference text
+    dev_data = train_total_data['dev']
+
+    # for evaluating as golden labels
+    dev_standard = test_total_data['dev']
+    # 🔹🔹🔹 到這邊 🔹🔹🔹
     # ==== 這裡開始是新的部分 ====
     # 判斷是不是 Qwen / Qwen3 類型模型
     is_qwen = "Qwen3" in args.bert_model_type or "Qwen" in args.bert_model_type
@@ -1273,6 +1283,7 @@ if __name__ == '__main__':
     train_dataset, test_dataset, category_dict = load_train_data_multilingual(args)
     inference_dataset = load_inference_data(args) # ID_LIST, TEXT_LIST, QA_LIST
     train(args, train_dataset, test_dataset, inference_dataset, category_dict)
+
 
 
 
