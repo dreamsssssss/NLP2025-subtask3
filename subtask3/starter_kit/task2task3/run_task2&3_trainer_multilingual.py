@@ -954,24 +954,24 @@ def train(args, train_total_data, test_total_data, inference_dataset, category_m
         inference(args, model, tokenize, batch_generator_test, args.inference_beta, logger, args.gpu, max_len, category_mapping)
 
     elif args.mode == 'train':
-    train_dataset = ReviewDataset(args, train_data)
-    dev_dataset = ReviewDataset(args, dev_data)
-    batch_num_train = train_dataset.get_batch_num(args.batch_size)
+        train_dataset = ReviewDataset(args, train_data)
+        dev_dataset = ReviewDataset(args, dev_data)
+        batch_num_train = train_dataset.get_batch_num(args.batch_size)
 
-    # optimizer
-    logger.info('initial optimizer......')
-    param_optimizer = list(model.named_parameters())
+        # optimizer
+        logger.info('initial optimizer......')
+        param_optimizer = list(model.named_parameters())
 
-    # 把 encoder（Qwen3-8B 或 BERT）跟其他 head 分開，且只挑 requires_grad=True 的參數
-    encoder_params = [p for n, p in param_optimizer if "encoder" in n and p.requires_grad]
-    other_params   = [p for n, p in param_optimizer if "encoder" not in n and p.requires_grad]
+        # 把 encoder（Qwen3-8B 或 BERT）跟其他 head 分開，且只挑 requires_grad=True 的參數
+        encoder_params = [p for n, p in param_optimizer if "encoder" in n and p.requires_grad]
+        other_params   = [p for n, p in param_optimizer if "encoder" not in n and p.requires_grad]
 
-    optimizer_grouped_parameters = [
-        {"params": encoder_params, "lr": args.tuning_bert_rate, "weight_decay": 0.01},
-        {"params": other_params,   "lr": args.learning_rate,    "weight_decay": 0.01},
-    ]
+        optimizer_grouped_parameters = [
+            {"params": encoder_params, "lr": args.tuning_bert_rate, "weight_decay": 0.01},
+            {"params": other_params,   "lr": args.learning_rate,    "weight_decay": 0.01},
+        ]
 
-    optimizer = AdamW(optimizer_grouped_parameters)
+        optimizer = AdamW(optimizer_grouped_parameters)
 
         # load saved model, optimizer and epoch num
         if args.reload and os.path.exists(model_path):
@@ -1273,6 +1273,7 @@ if __name__ == '__main__':
     train_dataset, test_dataset, category_dict = load_train_data_multilingual(args)
     inference_dataset = load_inference_data(args) # ID_LIST, TEXT_LIST, QA_LIST
     train(args, train_dataset, test_dataset, inference_dataset, category_dict)
+
 
 
 
