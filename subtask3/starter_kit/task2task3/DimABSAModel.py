@@ -1,60 +1,118 @@
-from transformers import BertModel
+# DimABSAModel.py
+import torch
 import torch.nn as nn
-
+from transformers import AutoModelForCausalLM, AutoModel
 
 class DimABSA(nn.Module):
-    def __init__(self, hidden_size, bert_model_type, num_category):
+    def __init__(self, hidden_size, backbone_name, category_num, 
+                 use_causal_lm=True, freeze_encoder=True):
+        super().__init__()
 
-        super(DimABSA, self).__init__()
-
-        self.bert = BertModel.from_pretrained(bert_model_type)
-
-        self.classifier_a_start = nn.Linear(hidden_size, 2)
-        self.classifier_a_end = nn.Linear(hidden_size, 2)
-        self.classifier_ao_start = nn.Linear(hidden_size, 2)
-        self.classifier_ao_end = nn.Linear(hidden_size, 2)
-        self.classifier_o_start = nn.Linear(hidden_size, 2)
-        self.classifier_o_end = nn.Linear(hidden_size, 2)
-        self.classifier_oa_start = nn.Linear(hidden_size, 2)
-        self.classifier_oa_end = nn.Linear(hidden_size, 2)
-        self.classifier_category = nn.Linear(hidden_size, num_category)
-        self.classifier_valence = nn.Linear(hidden_size, 1)
-        self.classifier_arousal = nn.Linear(hidden_size, 1)
-        # self.classifier_valence = nn.Linear(hidden_size, 9)
-        # self.classifier_arousal = nn.Linear(hidden_size, 9)
-
-    def forward(self, query_tensor, query_mask, query_seg, step):
-
-        hidden_states = self.bert(query_tensor, attention_mask=query_mask, token_type_ids=query_seg)[0]
-        if step == 'A':
-            predict_start = self.classifier_a_start(hidden_states)
-            predict_end = self.classifier_a_end(hidden_states)
-            return predict_start, predict_end
-        elif step == 'O':
-            predict_start = self.classifier_o_start(hidden_states)
-            predict_end = self.classifier_o_end(hidden_states)
-            return predict_start, predict_end
-        elif step == 'AO':
-            predict_start = self.classifier_ao_start(hidden_states)
-            predict_end = self.classifier_ao_end(hidden_states)
-            return predict_start, predict_end
-        elif step == 'OA':
-            predict_start = self.classifier_oa_start(hidden_states)
-            predict_end = self.classifier_oa_end(hidden_states)
-            return predict_start, predict_end
-        elif step == 'C':
-            category_hidden_states = hidden_states[:, 0, :]
-            category_scores = self.classifier_category(category_hidden_states)
-            return category_scores
-        elif step == 'Valence':
-            valence_hidden_states = hidden_states[:, 0, :]
-            valence_scores = self.classifier_valence(valence_hidden_states).squeeze(-1)
-            # valence_scores = self.classifier_valence(valence_hidden_states)[:,-1]
-            return valence_scores
-        elif step == 'Arousal':
-            arousal_hidden_states = hidden_states[:, 0, :]
-            arousal_scores = self.classifier_arousal(arousal_hidden_states).squeeze(-1)
-            # arousal_scores = self.classifier_arousal(arousal_hidden_states)[:,-1]
-            return arousal_scores
+        # 1) 載入 backbone：Qwen3-8B 用 CausalLM，BERT 可以走 AutoModel
+        if use_causal_lm:
+            self.encoder = AutoModelForCausalLM.from_pretrained(
+                backbone_name,
+                torch_dtype="auto",   # A100 80GB 可以讓它自動選 bfloat16 / fp16
+            )
         else:
-            raise KeyError('step error.')
+            self.encoder = AutoModel.from_pretrained(
+                backbone_name,
+                torch_dtype="auto",
+            )
+
+        # 2) 直接用模型 config 的 hidden_size
+        self.hidden_size = self.encoder.config.hidden_size
+
+        # 3) 判斷有沒有 token_type_ids（BERT 有，Qwen3 通常沒有）
+        cfg_dict = self.encoder.config.to_dict()
+        self.has_token_type_ids = cfg_dict.get("type_vocab_size", 0) > 0
+
+        # 4) 是否凍結 encoder（先建議凍結，確認 pipeline 沒問題）
+        self.freeze_encoder = freeze_encoder
+        if self.freeze_encoder:
+            for p in self.encoder.parameters():
+                p.requires_grad = False
+
+        # 5) 你的各種 head（下面名稱你可以換成你原本的）
+        # span 任務：start / end 都是 [B, L, 2]
+        self.a_start = nn.Linear(self.hidden_size, 2)
+        self.a_end   = nn.Linear(self.hidden_size, 2)
+
+        self.o_start = nn.Linear(self.hidden_size, 2)
+        self.o_end   = nn.Linear(self.hidden_size, 2)
+
+        self.ao_start = nn.Linear(self.hidden_size, 2)
+        self.ao_end   = nn.Linear(self.hidden_size, 2)
+
+        self.oa_start = nn.Linear(self.hidden_size, 2)
+        self.oa_end   = nn.Linear(self.hidden_size, 2)
+
+        # 類別分類（Task 3）
+        self.fc_category = nn.Linear(self.hidden_size, category_num)
+
+        # Valence / Arousal regression
+        self.fc_valence  = nn.Linear(self.hidden_size, 1)
+        self.fc_arousal  = nn.Linear(self.hidden_size, 1)
+
+        # 如果真的要省記憶體，可以開：
+        # self.encoder.gradient_checkpointing_enable()
+
+    def encode(self, input_ids, attention_mask, token_type_ids):
+        kwargs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "output_hidden_states": True,
+        }
+        if self.has_token_type_ids and token_type_ids is not None:
+            kwargs["token_type_ids"] = token_type_ids
+
+        if self.freeze_encoder:
+            with torch.no_grad():
+                outputs = self.encoder(**kwargs)
+        else:
+            outputs = self.encoder(**kwargs)
+
+        # Qwen3 CausalLM 回傳的是 CausalLMOutputWithPast，
+        # hidden_states[-1] 是最後一層 hidden: [B, L, H]
+        sequence_output = outputs.hidden_states[-1]
+        return sequence_output
+
+    def forward(self, input_ids, attention_mask, token_type_ids, task_type):
+        x = self.encode(input_ids, attention_mask, token_type_ids)
+
+        if task_type == 'A':
+            # aspect span
+            start = self.a_start(x)  # [B, L, 2]
+            end   = self.a_end(x)
+            return start, end
+
+        elif task_type == 'O':
+            start = self.o_start(x)
+            end   = self.o_end(x)
+            return start, end
+
+        elif task_type == 'AO':
+            start = self.ao_start(x)
+            end   = self.ao_end(x)
+            return start, end
+
+        elif task_type == 'OA':
+            start = self.oa_start(x)
+            end   = self.oa_end(x)
+            return start, end
+
+        elif task_type == 'C':
+            # 類別分類：這裡用 CLS 或平均都可以，看你原本怎麼做
+            pooled = x[:, 0, :]
+            return self.fc_category(pooled)
+
+        elif task_type == 'Valence':
+            pooled = x[:, 0, :]
+            return self.fc_valence(pooled).squeeze(-1)  # [B]
+
+        elif task_type == 'Arousal':
+            pooled = x[:, 0, :]
+            return self.fc_arousal(pooled).squeeze(-1)  # [B]
+
+        else:
+            raise ValueError(f"Unknown task_type: {task_type}")
