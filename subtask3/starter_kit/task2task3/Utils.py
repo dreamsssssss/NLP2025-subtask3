@@ -6,6 +6,7 @@ import numpy as np
 
 from torch.nn import functional as F
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.data._utils.collate import default_collate
 
 class ReviewDataset(Dataset):
     def __init__(self, args, dataset):
