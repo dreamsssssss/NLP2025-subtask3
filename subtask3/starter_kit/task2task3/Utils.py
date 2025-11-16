@@ -327,23 +327,61 @@ def _sanitize_for_collate(obj):
     return obj
 
 
+def _to_numeric_array(arr):
+    """
+    專門處理 numpy dtype=object 的陣列：
+    - 把裡面的 None 統一變成 0
+    - 其他如果是數字就轉成 int
+    - 遇到怪型態（例如小 list）就當 0
+    """
+    if not isinstance(arr, np.ndarray):
+        return arr
+    if arr.dtype != object:
+        return arr
+
+    # 如果是多維，先直接給一個全 0 的同 shape int64
+    if arr.ndim > 1:
+        return np.zeros(arr.shape, dtype=np.int64)
+
+    cleaned = []
+    for x in arr:
+        if x is None:
+            cleaned.append(0)
+        elif isinstance(x, (int, np.integer)):
+            cleaned.append(int(x))
+        elif isinstance(x, (float, np.floating)):
+            cleaned.append(int(x))
+        else:
+            # 其他奇怪型別，為了讓 collate 不炸，先當 0
+            cleaned.append(0)
+    return np.array(cleaned, dtype=np.int64)
+
+
 def _safe_collate(batch):
     """
-    比原本的 default_collate 多做幾件事：
-    1. 丟掉整個 sample 是 None 的情況
-    2. 處理 dict 裡 value 是 None 的欄位，幫它用同型別的零值補起來
-    3. 處理 numpy dtype=object -> 轉成正常的數值 array
+    比原本 default_collate 更「防呆」：
+    1. 丟掉整個 sample 是 None 的
+    2. 把 dict 裡的 numpy object array 先轉成正常的數值 array
+    3. 對於缺欄位 / None，用 prototype 做零值補齊
     """
-    # 1. 先把整個 sample 是 None 的丟掉
+    # 1) 先過濾掉整個是 None 的 sample
     batch = [b for b in batch if b is not None]
     if len(batch) == 0:
         raise RuntimeError("All samples in this batch are None. Please check dataset preprocessing.")
 
-    # 如果不是 dict，直接交給 default_collate（例如純 tensor 列表）
+    # 如果不是 dict（例如純 tensor list），直接交給 default_collate
     if not isinstance(batch[0], dict):
         return default_collate(batch)
 
-    # 2. 為每個 key 找一個「prototype」（第一個非 None 的值）
+    # 2) 先把所有 sample 內的 numpy object array 都轉成 numeric
+    for sample in batch:
+        if not isinstance(sample, dict):
+            continue
+        for k, v in list(sample.items()):
+            if isinstance(v, np.ndarray):
+                sample[k] = _to_numeric_array(v)
+
+    # 3) 建 prototype：每個 key 找一個「代表值」
     prototypes = {}
     for sample in batch:
         if not isinstance(sample, dict):
@@ -360,16 +398,12 @@ def _safe_collate(batch):
         for k, proto in prototypes.items():
             v = sample.get(k, None)
 
-            # 處理 numpy object array
-            if isinstance(v, np.ndarray) and v.dtype == object:
-                v = np.array(list(v), dtype=np.int64)
-
-            # 3. 如果這個 sample 的這個欄位是 None，用 prototype 建一個「零值」來補
             if v is None:
                 p = proto
                 if isinstance(p, torch.Tensor):
                     v = torch.zeros_like(p)
                 elif isinstance(p, np.ndarray):
+                    # 這裡的 p 已經是 numeric array（前面有 _to_numeric_array）
                     v = np.zeros_like(p)
                 elif isinstance(p, (int, float)):
                     v = type(p)(0)
@@ -378,7 +412,7 @@ def _safe_collate(batch):
                 elif isinstance(p, (list, tuple)):
                     v = type(p)([0] * len(p))
                 else:
-                    # 其他少見型別，直接複製 prototype 也行
+                    # 實在不知道是什麼，就直接用 prototype 本身
                     v = p
 
             fixed[k] = v
