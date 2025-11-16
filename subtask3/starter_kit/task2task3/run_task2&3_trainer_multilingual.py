@@ -912,11 +912,11 @@ def train(args, train_total_data, test_total_data, inference_dataset, category_m
 
     # 建立 DimABSA 模型，Qwen 用 causal LM、先把 encoder freeze 起來
     model = DimABSA(
-        args.hidden_size,
-        args.bert_model_type,
-        len(category_mapping),
+        hidden_size=args.hidden_size,          # 其實會被 encoder.config.hidden_size 覆蓋
+        backbone_name=args.bert_model_type,
+        category_num=len(category_mapping),
         use_causal_lm=is_qwen,
-        freeze_encoder=True,   # 先凍結 Qwen3-8B，只訓練 head，比較安全
+        freeze_encoder=True,   # 先凍起來，確定 pipeline 沒問題再考慮打開
     )
     # ==== 新的部分到這裡 ====
 
@@ -1283,6 +1283,7 @@ if __name__ == '__main__':
     train_dataset, test_dataset, category_dict = load_train_data_multilingual(args)
     inference_dataset = load_inference_data(args) # ID_LIST, TEXT_LIST, QA_LIST
     train(args, train_dataset, test_dataset, inference_dataset, category_dict)
+
 
 
 
