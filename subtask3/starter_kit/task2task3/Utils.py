@@ -306,17 +306,57 @@ def filter_unpaired(start_prob, end_prob, start, end, max_len):
     return filtered_start, filtered_end, filtered_prob
 
 
-def generate_batches(dataset, batch_size, shuffle=True, drop_last=True, gpu=True):
-    dataloader = DataLoader(dataset=dataset, batch_size=batch_size,
-                            shuffle=shuffle, drop_last=drop_last)
-    for data_dict in dataloader:
-        _dict = {}
-        for name, tensor in data_dict.items():
-            if gpu and name not in  ['line', 'id']:
-                _dict[name] = data_dict[name].cuda()
-            else:
-                _dict[name] = data_dict[name]
-        yield _dict
+def _sanitize_for_collate(obj):
+    """
+    把 numpy 裡面 dtype 是 object / string 的陣列轉成 Python list，
+    避免 default_collate 直接噴錯。
+    """
+    if isinstance(obj, np.ndarray):
+        # kind: 'O' = object, 'U'/'S' = unicode/bytes 字串
+        if obj.dtype.kind in {"O", "U", "S"}:
+            return [_sanitize_for_collate(x) for x in obj.tolist()]
+        else:
+            return obj
+
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_collate(v) for k, v in obj.items()}
+
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_for_collate(x) for x in obj]
+
+    return obj
+
+
+def _safe_collate(batch):
+    # 先把 batch 裡怪怪的 numpy 陣列轉乾淨
+    cleaned_batch = [_sanitize_for_collate(sample) for sample in batch]
+    # 再交給官方 default_collate
+    return default_collate(cleaned_batch)
+
+
+def generate_batches(dataset, batch_size, shuffle=True, gpu=False):
+    """
+    包一層 DataLoader：
+    - 用 _safe_collate 避開 dtype=object/str 的 numpy 陣列
+    - 如果 gpu=True，會自動把 tensor 丟到 cuda
+    """
+    dataloader = DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        collate_fn=_safe_collate,
+    )
+
+    use_cuda = gpu and torch.cuda.is_available()
+    device = torch.device("cuda") if use_cuda else torch.device("cpu")
+
+    for batch in dataloader:
+        if isinstance(batch, dict):
+            for k, v in batch.items():
+                if isinstance(v, torch.Tensor):
+                    batch[k] = v.to(device)
+        yield batch
+
 
 
 def create_directory(arguments):
