@@ -328,10 +328,65 @@ def _sanitize_for_collate(obj):
 
 
 def _safe_collate(batch):
-    # 先把 batch 裡怪怪的 numpy 陣列轉乾淨
-    cleaned_batch = [_sanitize_for_collate(sample) for sample in batch]
-    # 再交給官方 default_collate
+    """
+    比原本的 default_collate 多做幾件事：
+    1. 丟掉整個 sample 是 None 的情況
+    2. 處理 dict 裡 value 是 None 的欄位，幫它用同型別的零值補起來
+    3. 處理 numpy dtype=object -> 轉成正常的數值 array
+    """
+    # 1. 先把整個 sample 是 None 的丟掉
+    batch = [b for b in batch if b is not None]
+    if len(batch) == 0:
+        raise RuntimeError("All samples in this batch are None. Please check dataset preprocessing.")
+
+    # 如果不是 dict，直接交給 default_collate（例如純 tensor 列表）
+    if not isinstance(batch[0], dict):
+        return default_collate(batch)
+
+    # 2. 為每個 key 找一個「prototype」（第一個非 None 的值）
+    prototypes = {}
+    for sample in batch:
+        if not isinstance(sample, dict):
+            continue
+        for k, v in sample.items():
+            if v is None:
+                continue
+            if k not in prototypes:
+                prototypes[k] = v
+
+    cleaned_batch = []
+    for sample in batch:
+        fixed = {}
+        for k, proto in prototypes.items():
+            v = sample.get(k, None)
+
+            # 處理 numpy object array
+            if isinstance(v, np.ndarray) and v.dtype == object:
+                v = np.array(list(v), dtype=np.int64)
+
+            # 3. 如果這個 sample 的這個欄位是 None，用 prototype 建一個「零值」來補
+            if v is None:
+                p = proto
+                if isinstance(p, torch.Tensor):
+                    v = torch.zeros_like(p)
+                elif isinstance(p, np.ndarray):
+                    v = np.zeros_like(p)
+                elif isinstance(p, (int, float)):
+                    v = type(p)(0)
+                elif isinstance(p, str):
+                    v = ""
+                elif isinstance(p, (list, tuple)):
+                    v = type(p)([0] * len(p))
+                else:
+                    # 其他少見型別，直接複製 prototype 也行
+                    v = p
+
+            fixed[k] = v
+
+        cleaned_batch.append(fixed)
+
     return default_collate(cleaned_batch)
+
 
 
 def generate_batches(dataset, batch_size, shuffle=True, gpu=False):
