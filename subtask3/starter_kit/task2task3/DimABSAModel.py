@@ -80,6 +80,8 @@ class DimABSA(nn.Module):
     def forward(self, input_ids, attention_mask, token_type_ids, task_type):
         x = self.encode(input_ids, attention_mask, token_type_ids)
 
+        x = x.to(self.a_start.weight.dtype)
+        
         if task_type == 'A':
             # aspect span
             start = self.a_start(x)  # [B, L, 2]
@@ -116,3 +118,4 @@ class DimABSA(nn.Module):
 
         else:
             raise ValueError(f"Unknown task_type: {task_type}")
+
